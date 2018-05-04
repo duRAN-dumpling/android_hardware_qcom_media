@@ -65,12 +65,14 @@ class omx_venc: public omx_video
         OMX_U32 dev_resume(void);
         OMX_U32 dev_start_done(void);
         OMX_U32 dev_set_message_thread_id(pthread_t);
+        bool dev_handle_empty_eos_buffer(void);
         bool dev_use_buf( void *,unsigned,unsigned);
         bool dev_free_buf( void *,unsigned);
         bool dev_empty_buf(void *, void *,unsigned,unsigned);
         bool dev_fill_buf(void *, void *,unsigned,unsigned);
         bool dev_buffer_ready_to_queue(OMX_BUFFERHEADERTYPE *buffer);
         bool dev_get_buf_req(OMX_U32 *,OMX_U32 *,OMX_U32 *,OMX_U32);
+        bool dev_get_dimensions(OMX_U32 ,OMX_U32 *,OMX_U32 *);
         bool dev_set_buf_req(OMX_U32 *,OMX_U32 *,OMX_U32 *,OMX_U32);
         bool update_profile_level();
         bool dev_get_seq_hdr(void *, unsigned, unsigned *);

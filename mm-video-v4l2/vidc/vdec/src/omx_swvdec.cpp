@@ -1,7 +1,7 @@
 /**
  * @copyright
  *
- *   Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ *   Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions are met:
@@ -191,6 +191,25 @@ OMX_ERRORTYPE omx_swvdec::component_init(OMX_STRING cmp_name)
         m_swvdec_codec         = SWVDEC_CODEC_H263;
         m_omx_video_codingtype = OMX_VIDEO_CodingH263;
     }
+#ifdef _ANDROID_O_MR1_DIVX_CHANGES
+   else if (!strncmp(cmp_name,"OMX.qti.video.decoder.divxsw",OMX_MAX_STRINGNAME_SIZE)){
+        OMX_SWVDEC_LOG_LOW("video_decoder.divx");
+
+        strlcpy(m_cmp_name,              cmp_name, OMX_MAX_STRINGNAME_SIZE);
+        strlcpy(m_role_name, "video_decoder.divx", OMX_MAX_STRINGNAME_SIZE);
+
+        m_swvdec_codec         = SWVDEC_CODEC_MPEG4;
+        m_omx_video_codingtype = ((OMX_VIDEO_CODINGTYPE) QOMX_VIDEO_CodingDivx);
+   }else if (!strncmp(cmp_name,"OMX.qti.video.decoder.divx4sw",OMX_MAX_STRINGNAME_SIZE)){
+         OMX_SWVDEC_LOG_LOW("video_decoder.divx4");
+
+        strlcpy(m_cmp_name,              cmp_name, OMX_MAX_STRINGNAME_SIZE);
+        strlcpy(m_role_name, "video_decoder.divx4", OMX_MAX_STRINGNAME_SIZE);
+
+        m_swvdec_codec         = SWVDEC_CODEC_MPEG4;
+        m_omx_video_codingtype = ((OMX_VIDEO_CODINGTYPE) QOMX_VIDEO_CodingDivx);
+   }
+#else
     else if (((!strncmp(cmp_name,
                         "OMX.qti.video.decoder.divxsw",
                         OMX_MAX_STRINGNAME_SIZE))) ||
@@ -206,6 +225,7 @@ OMX_ERRORTYPE omx_swvdec::component_init(OMX_STRING cmp_name)
         m_swvdec_codec         = SWVDEC_CODEC_MPEG4;
         m_omx_video_codingtype = ((OMX_VIDEO_CODINGTYPE) QOMX_VIDEO_CodingDivx);
     }
+#endif
     else
     {
         OMX_SWVDEC_LOG_ERROR("'%s': invalid component name", cmp_name);
@@ -2839,14 +2859,23 @@ OMX_ERRORTYPE omx_swvdec::get_port_definition(
         p_port_def->bEnabled           = m_port_ip.enabled;
         p_port_def->bPopulated         = m_port_ip.populated;
 
+        // VTS uses input port dimensions to set OP dimensions
+        if ((retval = get_frame_dimensions_swvdec()) != OMX_ErrorNone)
+        {
+            goto get_port_definition_exit;
+        }
+
+        p_port_def->format.video.nFrameWidth  = m_frame_dimensions.width;
+        p_port_def->format.video.nFrameHeight = m_frame_dimensions.height;
+
         OMX_SWVDEC_LOG_HIGH("port index %d: "
-                            "count actual %d, count min %d, size %d",
+                            "count actual %d, count min %d, size %d, %d x %d",
                             p_port_def->nPortIndex,
                             p_port_def->nBufferCountActual,
                             p_port_def->nBufferCountMin,
-                            p_port_def->nBufferSize);
-
-        // frame dimensions & attributes don't apply to input port
+                            p_port_def->nBufferSize,
+                            p_port_def->format.video.nFrameWidth,
+                            p_port_def->format.video.nFrameHeight);
 
         p_port_def->format.video.eColorFormat       = OMX_COLOR_FormatUnused;
         p_port_def->format.video.eCompressionFormat = m_omx_video_codingtype;
@@ -4551,7 +4580,19 @@ OMX_ERRORTYPE omx_swvdec::flush(unsigned int port_index)
         {
             m_port_ip.flush_inprogress = OMX_TRUE;
 
-            // no separate SwVdec flush type for input
+            //for VTS test case IP flush , trigger flush all
+            // for IP flush, similar behavior is for hwcodecs
+            m_port_ip.flush_inprogress = OMX_TRUE;
+            m_port_op.flush_inprogress = OMX_TRUE;
+
+            swvdec_flush_type = SWVDEC_FLUSH_TYPE_ALL;
+
+            if ((retval_swvdec = swvdec_flush(m_swvdec_handle,
+                                              swvdec_flush_type)) !=
+                SWVDEC_STATUS_SUCCESS)
+            {
+                retval = retval_swvdec2omx(retval_swvdec);
+            }
         }
         else if (port_index == OMX_CORE_PORT_INDEX_OP)
         {
